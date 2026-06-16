@@ -27,5 +27,3 @@ alert:
   threshold:
     count: 50        # 에러 발생 횟수
     window-minutes: 30  # 시간 윈도우 (분)
-  slack:
-    webhook-url: "" # slack url 추가하기
