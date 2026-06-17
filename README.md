@@ -9,7 +9,7 @@
 
 - **에러 로그 수집** - 애플리케이션에서 발생한 에러 로그 수집 API
 - **실시간 패턴 감지** - Redis TTL 기반 시간 윈도우(30분) 내 에러 카운팅
-- **자동 장애 알림** - 임계치(50회) 초과 시 Slack Webhook으로 즉시 알림 발송(3회로 수정해서 테스트 진행)
+- **자동 장애 알림** - 임계치(10회) 초과 시 Slack Webhook으로 즉시 알림 발송(3회로 수정해서 테스트 진행)
 - **중복 알림 방지** - 알림 발송 후 Redis 카운트 초기화로 중복 알림 방지
 - **장애 이력 관리** - MySQL에 에러 로그 영구 저장 및 조회
 - **서비스별 조회** - 서비스명, 장애 감지 여부로 로그 필터링
@@ -53,7 +53,7 @@ TTL: 30분 (window-minutes)
 NullPointerException 발생
 → error:count:order-service:NullPointerException 카운트 증가
 → 처음 생성 시 TTL 30분 설정
-→ 30분 내 50회 초과 시 Slack 알림 발송
+→ 30분 내 10회 초과 시 Slack 알림 발송
 → 알림 발송 후 카운트 초기화 (중복 알림 방지)
 → 30분이 지나면 TTL 만료로 자동 초기화
 ```
@@ -61,7 +61,7 @@ NullPointerException 발생
 ### 서비스별 독립적 카운팅
 
 ```
-error:count:order-service:NullPointerException   → 50회 → 알림!
+error:count:order-service:NullPointerException   → 10회 → 알림!
 error:count:payment-service:TimeoutException      → 3회  → 대기중
 error:count:user-service:NullPointerException     → 12회 → 대기중
 
@@ -103,7 +103,7 @@ LogServiceImpl (구현체)
         ├── Redis 에러 카운트 증가
         │   (TTL 30분 / Key: error:count:{service}:{errorType})
         │
-        └── 임계치(50회) 초과
+        └── 임계치(10회) 초과
                 │ YES
                 ▼
         [Slack Webhook 알림 발송]
@@ -217,7 +217,7 @@ http://localhost:8080/swagger-ui.html
 
 • 서비스: order-service
 • 에러 타입: NullPointerException
-• 발생 횟수: 50회 / 30분 이내
+• 발생 횟수: 10회 / 30분 이내
 • 에러 메시지: null pointer at OrderService.java:52
 
 즉시 확인이 필요합니다!
@@ -230,7 +230,7 @@ http://localhost:8080/swagger-ui.html
 ```
 alert:
   threshold:
-    count: 50          # 에러 발생 횟수 임계치
+    count: 10          # 에러 발생 횟수 임계치
     window-minutes: 30 # 시간 윈도우 (분)
   slack:
     webhook-url: ""    # Slack Webhook URL
