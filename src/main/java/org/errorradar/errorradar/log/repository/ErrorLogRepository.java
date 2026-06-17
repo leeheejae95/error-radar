@@ -18,5 +18,5 @@ public interface ErrorLogRepository extends JpaRepository<ErrorLog, Long> {
     List<ErrorLog> findByIsAlertedTrue();
 
     // 서비스명으로 최신순 조회
-    List<ErrorLog> findByServiceNameOrderByOccurredAtDesc(String serviceName, LocalDateTime occurredAt);
+    List<ErrorLog> findByServiceNameOrderByOccurredAtDesc(String serviceName);
 }

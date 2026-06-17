@@ -1,4 +1,4 @@
-package org.errorradar.errorradar.dto;
+package org.errorradar.errorradar.log.dto;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;
