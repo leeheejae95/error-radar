@@ -11,8 +11,6 @@ import java.time.LocalDateTime;
 @Getter
 @Entity
 @NoArgsConstructor
-@AllArgsConstructor
-@Builder
 @Table(name = "error_logs")
 public class ErrorLog {
 
@@ -43,6 +41,16 @@ public class ErrorLog {
     // 발생시각
     @Column(name = "occurred_at", nullable = false)
     private LocalDateTime occurredAt;
+
+    @Builder
+    public ErrorLog(String serviceName, String errorType, String errorMessage, String environment) {
+        this.serviceName = serviceName;
+        this.errorType = errorType;
+        this.errorMessage = errorMessage;
+        this.environment = environment;
+        this.isAlerted = false;
+        this.occurredAt = LocalDateTime.now();
+    }
 
     public void markAsAlerted() {
         this.isAlerted = true;

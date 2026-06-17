@@ -38,6 +38,7 @@ public class AlertService {
 
             log.info("AlertService Slack알림 발송 완료 - 서비스: {}, 에러: {}", serviceName, errorType);
         } catch(Exception e) {
+            log.error("[AlertService] Slack 알림 발송 실패 - 원인: {}", e.getMessage(), e);
             throw new CustomException(ErrorCode.ALERT_SEND_FAIL);
         }
     }
