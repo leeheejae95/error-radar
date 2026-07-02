@@ -61,9 +61,9 @@ NullPointerException 발생
 ### 서비스별 독립적 카운팅
 
 ```
-error:count:order-service:NullPointerException   → 10회 → 알림!
-error:count:payment-service:TimeoutException      → 3회  → 대기중
-error:count:user-service:NullPointerException     → 12회 → 대기중
+error:count:order-service:NullPointerException   → 10회시 알림
+error:count:payment-service:TimeoutException     → 3회 대기중
+error:count:user-service:NullPointerException    → 12회 대기중
 
 서비스명 + 에러타입 조합으로 Key 생성
 → 각 서비스/에러 타입별 독립적 감지
@@ -172,7 +172,7 @@ cd error-radar
 # src/main/resources/application.yml
 alert:
   slack:
-    webhook-url: https://hooks.slack.com/services/xxx/yyy/zzz
+    webhook-url: https://hooks.slack.com/services/.../.../...
 ```
 
 ### 3. Docker 컨테이너 실행
