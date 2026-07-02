@@ -182,7 +182,7 @@ docker-compose up -d
 
 ### 4. 애플리케이션 실행
 ```
-./gradlew bootRun
+ErrorRadarApplication 실행
 ```
 
 ### 5. Swagger UI 접속
