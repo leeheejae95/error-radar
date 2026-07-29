@@ -54,7 +54,7 @@ TTL: 30분 (window-minutes)
 NullPointerException 발생
 → error:count:order-service:NullPointerException 카운트 증가
 → 처음 생성 시 TTL 30분 설정
-→ 30분 내 10회 초과 시 Slack 알림 발송
+→ 30분 내 3회 초과 시 Slack 알림 발송
 → 알림 발송 후 카운트 초기화 (중복 알림 방지)
 → 30분이 지나면 TTL 만료로 자동 초기화
 ```
@@ -62,7 +62,7 @@ NullPointerException 발생
 ### 서비스별 독립적 카운팅
 
 ```
-error:count:order-service:NullPointerException   → 10회시 알림
+error:count:order-service:NullPointerException   → 3회시 알림
 error:count:payment-service:TimeoutException     → 3회 대기중
 error:count:user-service:NullPointerException    → 12회 대기중
 
@@ -231,7 +231,7 @@ http://localhost:8080/swagger-ui.html
 
 • 서비스: order-service
 • 에러 타입: NullPointerException
-• 발생 횟수: 10회 / 30분 이내
+• 발생 횟수: 3회 / 30분 이내
 • 에러 메시지: null pointer at OrderService.java:52
 
 즉시 확인이 필요합니다!
