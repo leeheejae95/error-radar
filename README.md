@@ -210,7 +210,7 @@ http://localhost:8080/swagger-ui.html
 
 | Method | URL | 설명 |
 |--------|-----|------|
-| POST | /api/logs/collect | 에러 로그 수집 (Kafka 비동기 처리, 202) |
+| POST | /api/logs/collect | 에러 로그 수집 (Kafka 비동기 처리) |
 | GET | /api/logs/getLogs | 전체 에러 로그 조회 |
 | GET | /api/logs/service/{serviceName} | 서비스별 에러 로그 조회 |
 | GET | /api/logs/alerted | 장애 감지된 로그 조회 |
