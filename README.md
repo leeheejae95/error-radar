@@ -1,6 +1,6 @@
 # Error Radar - 실시간 장애 감지 플랫폼
 
-> Spring Boot + Redis 기반 실시간 에러 패턴 감지 및 Slack 알림 시스템
+> Spring Boot와 Redis 및 kafka 기반 실시간 에러 패턴 감지 및 Slack 알림 시스템
 > 실무에서 반복되는 에러 패턴을 감지하고 즉시 알림을 발송합니다.
 
 <br>
@@ -66,7 +66,7 @@ error:count:order-service:NullPointerException   → 10회시 알림
 error:count:payment-service:TimeoutException     → 3회 대기중
 error:count:user-service:NullPointerException    → 12회 대기중
 
-서비스명 + 에러타입 조합으로 Key 생성
+서비스명과 에러타입 조합으로 Key 생성
 → 각 서비스/에러 타입별 독립적 감지
 ```
 
@@ -84,7 +84,7 @@ LogServiceImpl (구현체)
 ### @Transactional 원자성 보장
 
 ```
-에러 로그 저장 + isAlerted 업데이트
+에러 로그 저장과 isAlerted 업데이트
 → 두 작업이 하나의 트랜잭션으로 처리
 → 부분 실패 없음
 ```
