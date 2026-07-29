@@ -1,10 +1,14 @@
 package org.errorradar.errorradar.log.dto;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Getter
+@Builder
 @NoArgsConstructor
+@AllArgsConstructor
 public class LogRequest {
 
     private String serviceName; // 서비스명

@@ -14,27 +14,32 @@ import java.util.Map;
 @Service
 public class AlertService {
 
-    @Value("${alert.slack.webhook-url}")
-    private String webhookUrl;
+    private final String webhookUrl;
+    private final int thresholdCount;
+    private final int windowMinutes;
+    private final RestClient restClient;
 
-    @Value("${alert.threshold.count}")
-    private int thresholdCount;
-
-    @Value("${alert.threshold.window-minutes}")
-    private int windowMinutes;
-
-    private final RestClient resetClient = RestClient.create();
+    public AlertService(
+            @Value("${alert.slack.webhook-url}") String webhookUrl,
+            @Value("${alert.threshold.count}") int thresholdCount,
+            @Value("${alert.threshold.window-minutes}") int windowMinutes,
+            RestClient restClient) {
+        this.webhookUrl = webhookUrl;
+        this.thresholdCount = thresholdCount;
+        this.windowMinutes = windowMinutes;
+        this.restClient = restClient;
+    }
 
     public void sendSlackAlert(String serviceName, String errorType, String errorMessage, long count) {
         String message = buildMessage(serviceName, errorType, errorMessage, count);
 
         try {
-            resetClient.post()
+            restClient.post()
                     .uri(webhookUrl)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of("text", message))
-                    .retrieve() // 응답받을 준비
-                    .toBodilessEntity(); // 알림이 잘 전송됐는지 ok라는 상태코드로만 확인
+                    .retrieve()
+                    .toBodilessEntity();
 
             log.info("AlertService Slack알림 발송 완료 - 서비스: {}, 에러: {}", serviceName, errorType);
         } catch(Exception e) {
