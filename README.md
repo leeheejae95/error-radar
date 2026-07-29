@@ -263,6 +263,118 @@ alert:
 
 ## 트러블슈팅
 
-- Windows 한글 경로로 Gradle ClassNotFoundException - argfile CP949 오인식 원인과 GRADLE_USER_HOME 해결법
-- GitHub Actions tmpdir 경로 오류 - OS 조건 분기로 해결
-- Kafka Consumer 파티션 할당 지연으로 Awaitility 타임아웃 - 30초와 pollInterval로 해결
+### 1. Windows 한글 경로로 인한 Gradle 테스트 실패
+
+**증상**
+```
+Error occurred during initialization of VM
+java.lang.ClassNotFoundException: worker.org.gradle.process.internal.worker.GradleWorkerMain
+```
+
+**원인**
+
+Gradle은 테스트를 별도 JVM 프로세스로 실행
+이때 JVM 인수가 너무 길어지면 argfile(`@파일경로`) 방식으로 인수를 파일에 쓰고 Java에 넘김
+
+```
+# Gradle이 내부적으로 이런 방식으로 worker를 실행
+java @C:\Users\이희재\.gradle\.tmp\gradle-worker-classpath123.txt worker.GradleWorkerMain
+```
+
+이 argfile이 `GRADLE_USER_HOME/.tmp/` 하위에 UTF-8로 작성되는데,
+기본 경로(`C:\Users\이희재\.gradle`)에 한글이 포함되면
+Windows 한국어로 파일을 읽는 Java가 경로를 오인식해 JAR를 찾지 못합니다.
+
+에러 메시지만 보면 Gradle 내부 클래스 문제처럼 보여서 원인을 파악하기가 매우 어려웠음
+
+**해결**
+
+`gradle.properties`에 한글이 없는 경로로 지정
+```properties
+org.gradle.user.home=C:/gradle-home
+```
+
+단, 기존 daemon이 살아있으면 위 설정 무시
+반드시 환경변수 설정 후 daemon을 재시작해야함
+
+---
+
+### 2. GitHub Actions(Linux)에서 Windows 전용 tmpdir 경로 오류
+
+**증상**
+```
+WARNING: java.io.tmpdir directory does not exist: C:/Temp/kafka-test
+org.apache.kafka.common.KafkaException: Failed to create local log directory
+MockitoInitializationException: Could not self-attach to current VM
+```
+
+**원인**
+
+- EmbeddedKafka는 Windows에서 기본 `C:\Temp\`에 임시 파일을 쓰는데,
+일반적으로 이 경로가 없어서 테스트가 실패
+- 이를 해결하기 위해 `build.gradle`에 아래 설정 추가
+
+```groovy
+// 문제가 된 코드
+tasks.named('test') {
+    useJUnitPlatform()
+    systemProperty 'java.io.tmpdir', 'C:/Temp/kafka-test'  // Windows 전용 경로
+}
+```
+
+로컬(Windows)에서는 잘 동작했지만, GitHub Actions에 푸시하니
+`C:/Temp/kafka-test` 경로가 Linux에 존재하지 않아 EmbeddedKafka와 Mockito가 함께 실패
+
+**해결**
+
+OS를 감지해 Windows에서만 해당 tmpdir을 적용
+```groovy
+tasks.named('test') {
+    useJUnitPlatform()
+    if (System.getProperty('os.name').toLowerCase().contains('windows')) {
+        systemProperty 'java.io.tmpdir', 'C:/Temp/kafka-test'
+    }
+}
+```
+
+---
+
+### 3. Kafka Consumer 파티션 할당 지연으로 인한 통합 테스트 타임아웃
+
+**증상**
+```
+org.awaitility.core.ConditionTimeoutException:
+  Condition with ... was not fulfilled within 10 seconds.
+```
+
+**원인**
+
+Kafka Consumer는 비동기로 동작하기 때문에 아래와 같이 테스트하면 항상 실패
+
+```java
+// 잘못된 방법 - Consumer가 아직 처리 안 했으니 DB에 데이터가 없음
+logProducerService.sendLog(event);  // Kafka에 발행
+assertThat(errorLogRepository.count()).isEqualTo(1);  // 즉시 확인 → 실패
+```
+
+- 그래서 Awaitility로 "DB에 데이터가 생길 때까지 기다려" 라고 지정하는데,
+EmbeddedKafka 환경에서 Consumer가 최초 파티션을 할당받기까지 `NOT_COORDINATOR` 재시도로
+약 9초 소요
+- 타임아웃을 10초로 설정하면 DB 저장 시점이 타임아웃 직후가 되어 간헐적으로 실패
+
+```java
+// 타임아웃이 너무 짧아서 실패하는 코드
+Awaitility.await()
+    .atMost(Duration.ofSeconds(10))  // Consumer 파티션 할당에만 ~9초 소요
+    .until(() -> errorLogRepository.count() == 1);
+```
+
+**해결**
+
+Awaitility 타임아웃을 30초로 늘리고 폴링 간격 명시:
+```java
+Awaitility.await()
+    .atMost(Duration.ofSeconds(30))      // 최대 30초까지 대기
+    .pollInterval(Duration.ofSeconds(1)) // 1초마다 조건 확인
+    .until(() -> errorLogRepository.count() == 1);
+```
