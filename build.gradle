@@ -52,5 +52,7 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
-    systemProperty 'java.io.tmpdir', 'C:/Temp/kafka-test'
+    if (System.getProperty('os.name').toLowerCase().contains('windows')) {
+        systemProperty 'java.io.tmpdir', 'C:/Temp/kafka-test'
+    }
 }
