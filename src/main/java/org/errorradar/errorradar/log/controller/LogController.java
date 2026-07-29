@@ -4,9 +4,13 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.errorradar.errorradar.global.errorcode.ErrorCode;
+import org.errorradar.errorradar.global.exception.CustomException;
 import org.errorradar.errorradar.global.response.ApiResponse;
+import org.errorradar.errorradar.log.dto.LogEvent;
 import org.errorradar.errorradar.log.dto.LogRequest;
 import org.errorradar.errorradar.log.dto.LogResponse;
+import org.errorradar.errorradar.log.producer.LogProducerService;
 import org.errorradar.errorradar.log.service.LogService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,18 +25,29 @@ import java.util.List;
 public class LogController {
 
     private final LogService logService;
+    private final LogProducerService logProducerService;
 
     @Operation(
             summary = "에러 로그 수집",
-            description = "애플리케이션에서 발생한 에러 로그를 수집합니다. 임계치 초과 시 Slack 알림이 발송됩니다."
+            description = "애플리케이션에서 발생한 에러 로그를 Kafka로 비동기 처리합니다. 임계치 초과 시 Slack 알림이 발송됩니다."
     )
     @PostMapping("/collect")
-    public ResponseEntity<ApiResponse<LogResponse>> collectLog(@RequestBody LogRequest request) {
+    public ResponseEntity<ApiResponse<String>> collectLog(@RequestBody LogRequest request) {
         log.info("LogController 에러 로그 수집 요청 - 서비스: {}, 에러: {}", request.getServiceName(), request.getErrorType());
 
-        LogResponse logResponse = logService.collectLog(request);
+        validateRequest(request);
 
-        return ResponseEntity.ok(ApiResponse.ok(logResponse));
+        LogEvent event = LogEvent.builder()
+                .serviceName(request.getServiceName())
+                .errorType(request.getErrorType())
+                .errorMessage(request.getErrorMessage())
+                .environment(request.getEnvironment())
+                .build();
+
+        logProducerService.sendLog(event);
+
+        return ResponseEntity.accepted()
+                .body(ApiResponse.ok("로그가 접수되었습니다."));
     }
 
     @Operation(
@@ -42,10 +57,7 @@ public class LogController {
     @GetMapping("/getLogs")
     public ResponseEntity<ApiResponse<List<LogResponse>>> getLogs() {
         log.info("LogController 전체 에러 로그 요청");
-
-        List<LogResponse> logResponse = logService.getLogs();
-
-        return ResponseEntity.ok(ApiResponse.ok(logResponse));
+        return ResponseEntity.ok(ApiResponse.ok(logService.getLogs()));
     }
 
     @Operation(
@@ -55,10 +67,7 @@ public class LogController {
     @GetMapping("/service/{serviceName}")
     public ResponseEntity<ApiResponse<List<LogResponse>>> getLogsByService(@PathVariable String serviceName) {
         log.info("LogController 서비스별 에러로그 조회 요청 - 서비스: {}", serviceName);
-
-        List<LogResponse> logResponses = logService.getLogsByService(serviceName);
-
-        return ResponseEntity.ok(ApiResponse.ok(logResponses));
+        return ResponseEntity.ok(ApiResponse.ok(logService.getLogsByService(serviceName)));
     }
 
     @Operation(
@@ -68,10 +77,18 @@ public class LogController {
     @GetMapping("/alerted")
     public ResponseEntity<ApiResponse<List<LogResponse>>> getAlertedLogs() {
         log.info("LogController 장애 감지 로그 요청");
-
-        List<LogResponse> logResponses = logService.getAlertedLogs();
-
-        return ResponseEntity.ok(ApiResponse.ok(logResponses));
+        return ResponseEntity.ok(ApiResponse.ok(logService.getAlertedLogs()));
     }
 
+    private void validateRequest(LogRequest request) {
+        if (request.getServiceName() == null || request.getServiceName().isBlank()) {
+            throw new CustomException(ErrorCode.LOG_SERVICE_NOT_FOUND);
+        }
+        if (request.getErrorType() == null || request.getErrorType().isBlank()) {
+            throw new CustomException(ErrorCode.INVALID_LOG_LEVEL);
+        }
+        if (request.getErrorMessage() == null || request.getErrorMessage().isBlank()) {
+            throw new CustomException(ErrorCode.LOG_MESSAGE_NOT_FOUND);
+        }
+    }
 }

@@ -1,5 +1,6 @@
 package org.errorradar.errorradar.integration;
 
+import org.awaitility.Awaitility;
 import org.errorradar.errorradar.alert.service.AlertService;
 import org.errorradar.errorradar.log.dto.LogRequest;
 import org.errorradar.errorradar.log.entity.ErrorLog;
@@ -11,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
+import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -22,17 +24,28 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import tools.jackson.databind.ObjectMapper;
 
-import static org.hamcrest.Matchers.*;
+import java.time.Duration;
+
+import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
 @ActiveProfiles("test")
+@EmbeddedKafka(
+        partitions = 1,
+        topics = "error-logs",
+        bootstrapServersProperty = "spring.kafka.bootstrap-servers",
+        brokerProperties = {"log.cleaner.enable=false"}
+)
 class LogIntegrationTest {
 
     @Container
@@ -59,7 +72,7 @@ class LogIntegrationTest {
     private AlertService alertService;
 
     private MockMvc mockMvc;
-    private final tools.jackson.databind.ObjectMapper objectMapper = new tools.jackson.databind.ObjectMapper();
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
@@ -69,8 +82,8 @@ class LogIntegrationTest {
     }
 
     @Test
-    @DisplayName("로그 수집 API가 로그를 저장하고 응답을 반환한다")
-    void 로그_수집_API_성공() throws Exception {
+    @DisplayName("로그 수집 API 호출 시 202를 반환하고 비동기로 DB 저장")
+    void 로그_수집_API_성공_비동기_저장() throws Exception {
         LogRequest request = LogRequest.builder()
                 .serviceName("user-service")
                 .errorType("NullPointerException")
@@ -81,14 +94,17 @@ class LogIntegrationTest {
         mockMvc.perform(post("/api/logs/collect")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.serviceName").value("user-service"))
-                .andExpect(jsonPath("$.data.errorType").value("NullPointerException"))
-                .andExpect(jsonPath("$.data.errorMessage").value("Null pointer occurred"));
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.data").value("로그가 접수되었습니다."));
+
+        Awaitility.await()
+                .atMost(Duration.ofSeconds(30))
+                .pollInterval(Duration.ofSeconds(1))
+                .until(() -> errorLogRepository.count() == 1);
     }
 
     @Test
-    @DisplayName("서비스명 없이 로그 수집 요청 시 400을 반환한다")
+    @DisplayName("서비스명 없이 요청 시 400 반환")
     void 로그_수집_서비스명_누락_400_반환() throws Exception {
         LogRequest request = LogRequest.builder()
                 .serviceName("")
@@ -103,7 +119,7 @@ class LogIntegrationTest {
     }
 
     @Test
-    @DisplayName("전체 로그 조회 API가 저장된 모든 로그를 반환한다")
+    @DisplayName("전체 로그 조회 API가 저장된 모든 로그 반환")
     void 전체_로그_조회_API_성공() throws Exception {
         saveErrorLog("user-service", "NPE", false);
         saveErrorLog("order-service", "TimeoutException", false);
@@ -114,7 +130,7 @@ class LogIntegrationTest {
     }
 
     @Test
-    @DisplayName("서비스별 로그 조회 API가 해당 서비스의 로그만 반환한다")
+    @DisplayName("서비스별 로그 조회 API가 해당 서비스 로그 반환")
     void 서비스별_로그_조회_API_성공() throws Exception {
         saveErrorLog("user-service", "NPE", false);
         saveErrorLog("order-service", "TimeoutException", false);
@@ -126,7 +142,7 @@ class LogIntegrationTest {
     }
 
     @Test
-    @DisplayName("알림 발송된 로그 조회 API가 alerted 로그만 반환한다")
+    @DisplayName("알림 발송된 로그 조회 API가 alerted 로그반환")
     void 알림발송_로그_조회_API_성공() throws Exception {
         saveErrorLog("user-service", "NPE", false);
         saveErrorLog("order-service", "TimeoutException", true);
@@ -138,8 +154,8 @@ class LogIntegrationTest {
     }
 
     @Test
-    @DisplayName("임계치 초과 시 알림 서비스가 호출되고 로그가 정상 저장된다")
-    void 임계치_초과시_알림_호출_및_로그_저장() throws Exception {
+    @DisplayName("임계치(3회) 도달 시 알림 발송")
+    void 임계치_초과시_Kafka_비동기_알림_발송() throws Exception {
         LogRequest request = LogRequest.builder()
                 .serviceName("payment-service")
                 .errorType("DatabaseException")
@@ -147,17 +163,17 @@ class LogIntegrationTest {
                 .environment("prod")
                 .build();
 
-        // 임계치(3회) 달성까지 반복 요청
         for (int i = 0; i < 3; i++) {
             mockMvc.perform(post("/api/logs/collect")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isOk());
+                    .andExpect(status().isAccepted());
         }
 
-        mockMvc.perform(get("/api/logs/service/payment-service"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data", hasSize(3)));
+        Awaitility.await()
+                .atMost(Duration.ofSeconds(30))
+                .pollInterval(Duration.ofSeconds(1))
+                .until(() -> errorLogRepository.count() == 3);
     }
 
     private void saveErrorLog(String serviceName, String errorType, boolean isAlerted) {
