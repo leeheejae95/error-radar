@@ -33,11 +33,12 @@ Jennifer APM으로 장애를 분석하면서 동일한 에러 패턴이 반복�
 | Language | Java 21 |  |
 | Framework | Spring Boot 4.0.6 |  |
 | ORM | Spring Data JPA | 에러 로그 저장 |
-| Cache | Redis 7.2 | TTL 기반 시간 윈도우 카운팅 |
+| Cache | Redis 7.2 | TTL 기반 시간 윈도우 카운팅 |           
+| Message Queue | Apache Kafka 4.1.2 | 비동기 로그 처리 파이프라인 |  
 | DB | MySQL 8.0 | 장애 이력 저장 |
 | 알림 | Slack Webhook | 실무에서 많이 사용하는 알림 채널 |
 | HTTP | RestClient | Slack API 호출 |
-| Container | Docker | MySQL, Redis 컨테이너 실행 |
+| Container | Docker | MySQL, Redis, Kafka 컨테이너 실행 |
 | 문서화 | Swagger | API 테스트 및 문서화 |
 
 <br>
@@ -98,12 +99,18 @@ LogServiceImpl (구현체)
         ▼ POST /api/logs/collect
 [Spring Boot API]
         │
+        ▼ Kafka topic(error-logs)에 메시지 발행
+[202 Accepted 즉시 응답]
+
+        ▼ (비동기)
+[Kafka Consumer]
+        │
         ├── MySQL에 에러 로그 저장
         │
         ├── Redis 에러 카운트 증가
         │   (TTL 30분 / Key: error:count:{service}:{errorType})
         │
-        └── 임계치(10회) 초과
+        └── 임계치(3회) 초과
                 │ YES
                 ▼
         [Slack Webhook 알림 발송]
@@ -120,9 +127,15 @@ LogServiceImpl (구현체)
 ```
 src/main/java/org/errorradar/errorradar/
 ├── config/
+│   ├── KafkaConfig.java               # Kafka Producer/Consumer 설정                                                              
+│   ├── KafkaTopicConfig.java          # Kafka 토픽 상수
 │   ├── RedisConfig.java               # Redis 직렬화 설정
 │   └── SwaggerConfig.java             # Swagger UI 설정
 ├── log/
+│   ├── producer/                                             
+│   │   └── LogProducerService.java    # Kafka 메시지 발행   
+│   ├── consumer/                                         
+│   │   └── LogConsumerService.java    # Kafka 메시지 수신 및 처리  
 │   ├── entity/						   # 에러 로그 엔티티 (JPA)
 │   │   └── ErrorLog.java              # 에러 로그 엔티티 (JPA)
 │   ├── repository/
@@ -134,6 +147,7 @@ src/main/java/org/errorradar/errorradar/
 │   ├── controller/
 │   │   └── LogController.java         # 로그 수집 REST API
 │   └── dto/
+│       ├── LogEvent.java              # Kafka 메시지 DTO   
 │       ├── LogRequest.java            # 로그 수집 요청 DTO
 │       └── LogResponse.java           # 로그 수집 응답 DTO
 ├── pattern/
@@ -196,7 +210,7 @@ http://localhost:8080/swagger-ui.html
 
 | Method | URL | 설명 |
 |--------|-----|------|
-| POST | /api/logs/collect | 에러 로그 수집 (패턴 감지 + Slack 알림) |
+| POST | /api/logs/collect | 에러 로그 수집 (Kafka 비동기 처리, 202) |
 | GET | /api/logs/getLogs | 전체 에러 로그 조회 |
 | GET | /api/logs/service/{serviceName} | 서비스별 에러 로그 조회 |
 | GET | /api/logs/alerted | 장애 감지된 로그 조회 |
@@ -243,5 +257,12 @@ alert:
 - **Spring AOP 적용** - 예외 발생 시 자동으로 에러 로그 수집 (현재는 API 직접 호출)
 - **에러 통계 대시보드** - 서비스별 에러 발생 추이 시각화
 - **알림 채널 확장** - 이메일, 카카오톡 등 다양한 알림 채널 지원
-- **GitHub Actions CI/CD** - 자동 빌드 및 테스트
 - **MSA 전환** - 도메인 패키지 기반으로 서비스 분리 가능한 구조
+
+<br>
+
+## 트러블슈팅
+
+- Windows 한글 경로로 Gradle ClassNotFoundException - argfile CP949 오인식 원인과 GRADLE_USER_HOME 해결법
+- GitHub Actions tmpdir 경로 오류 - OS 조건 분기로 해결
+- Kafka Consumer 파티션 할당 지연으로 Awaitility 타임아웃 - 30초와 pollInterval로 해결
