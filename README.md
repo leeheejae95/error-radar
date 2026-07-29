@@ -283,7 +283,7 @@ java @C:\Users\이희재\.gradle\.tmp\gradle-worker-classpath123.txt worker.Grad
 
 이 argfile이 `GRADLE_USER_HOME/.tmp/` 하위에 UTF-8로 작성되는데,
 기본 경로(`C:\Users\이희재\.gradle`)에 한글이 포함되면
-Windows 한국어로 파일을 읽는 Java가 경로를 오인식해 JAR를 찾지 못합니다.
+Windows 한국어로 파일을 읽는 Java가 경로를 오인식해 JAR를 찾지 못함
 
 에러 메시지만 보면 Gradle 내부 클래스 문제처럼 보여서 원인을 파악하기가 매우 어려웠음
 
