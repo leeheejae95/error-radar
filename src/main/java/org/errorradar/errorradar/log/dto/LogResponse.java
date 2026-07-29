@@ -22,6 +22,7 @@ public class LogResponse {
                 .id(errorLog.getId())
                 .serviceName(errorLog.getServiceName())
                 .errorType(errorLog.getErrorType())
+                .errorMessage(errorLog.getErrorMessage())
                 .environment(errorLog.getEnvironment())
                 .occurredAt(errorLog.getOccurredAt())
                 .build();

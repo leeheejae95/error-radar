@@ -1,0 +1,12 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+alert:
+  threshold:
+    count: 3
+    window-minutes: 30
+  slack:
+    webhook-url: "http://localhost/test-webhook"
