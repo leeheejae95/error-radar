@@ -322,7 +322,7 @@ tasks.named('test') {
 }
 ```
 
-로컬(Windows)에서는 잘 동작했지만, GitHub Actions에 푸시하니
+로컬에서는 잘 동작했지만, GitHub Actions에 푸시하니
 `C:/Temp/kafka-test` 경로가 Linux에 존재하지 않아 EmbeddedKafka와 Mockito가 함께 실패
 
 **해결**
