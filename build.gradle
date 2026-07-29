@@ -36,6 +36,9 @@ dependencies {
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
 
+    // Kafka
+    implementation 'org.springframework.kafka:spring-kafka'
+
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
@@ -43,9 +46,13 @@ dependencies {
     testImplementation 'org.testcontainers:mysql'
     testImplementation 'org.testcontainers:junit-jupiter'
     testImplementation 'com.squareup.okhttp3:mockwebserver:4.12.0'
+    testImplementation 'org.springframework.kafka:spring-kafka-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 tasks.named('test') {
     useJUnitPlatform()
+    if (System.getProperty('os.name').toLowerCase().contains('windows')) {
+        systemProperty 'java.io.tmpdir', 'C:/Temp/kafka-test'
+    }
 }
