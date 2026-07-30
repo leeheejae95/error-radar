@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.errorradar.errorradar.alert.service.AlertService;
 import org.errorradar.errorradar.config.KafkaTopicConfig;
+import org.errorradar.errorradar.global.metrics.ErrorRadarMetrics;
 import org.errorradar.errorradar.log.dto.LogEvent;
 import org.errorradar.errorradar.log.entity.ErrorLog;
 import org.errorradar.errorradar.log.repository.ErrorLogRepository;
