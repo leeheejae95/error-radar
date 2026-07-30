@@ -1,4 +1,15 @@
 spring:
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      group-id: error-radar-group
+      auto-offset-reset: earliest # 토픽에 쌓인 메시지 처음부터 읽기
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
   datasource:
     url: jdbc:mysql://localhost:3306/errorradar
     username: errorradar
@@ -16,6 +27,23 @@ spring:
       host: localhost
       port: 6379
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus, metrics
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: error-radar
+
+jwt:
+  secret: "errorradar-secret-key-must-be-at-least-32-bytes-long-for-hs256"
+  access-token-expiry: 3600000      # 1시간 (ms)
+  refresh-token-expiry: 604800000   # 7일 (ms)
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
@@ -25,7 +53,7 @@ springdoc:
 # 에러 임계치 설정
 alert:
   threshold:
-    count: 50        # 에러 발생 횟수
+    count: 3            # 에러 발생 횟수
     window-minutes: 30  # 시간 윈도우 (분)
   slack:
     webhook-url: "" # slack url 추가하기
