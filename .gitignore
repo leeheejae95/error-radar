@@ -11,10 +11,9 @@ build/
 # BlueJ files
 *.ctxt
 
-# Mobile Tools for Java (J2ME)
 .mtj.tmp/
 
-# Package Files #
+# 패키지 파일 #
 *.jar
 *.war
 *.nar
@@ -23,6 +22,10 @@ build/
 *.tar.gz
 *.rar
 
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+
+# 로컬환경 변수
+application-local.yaml
+application-local.yml
+.env

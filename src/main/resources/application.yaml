@@ -40,7 +40,7 @@ management:
       application: error-radar
 
 jwt:
-  secret: "errorradar-secret-key-must-be-at-least-32-bytes-long-for-hs256"
+  secret: ${JWT_SECRET:}
   access-token-expiry: 3600000      # 1시간 (ms)
   refresh-token-expiry: 604800000   # 7일 (ms)
 
@@ -56,4 +56,8 @@ alert:
     count: 3            # 에러 발생 횟수
     window-minutes: 30  # 시간 윈도우 (분)
   slack:
-    webhook-url: "" # slack url 추가하기
+    webhook-url: ${SLACK_WEBHOOK_URL:}
+
+admin:
+  email: ${ADMIN_EMAIL:}
+  password: ${ADMIN_PASSWORD:}
