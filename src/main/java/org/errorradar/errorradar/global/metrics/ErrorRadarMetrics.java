@@ -30,6 +30,7 @@ public class ErrorRadarMetrics {
                 .register(registry);
     }
 
+    // 이벤트 발생시 카운트 증가
     public void incrementLogCollected() { logCollectedCounter.increment(); }
     public void incrementAlertSent()    { alertSentCounter.increment(); }
     public void incrementLoginSuccess() { loginSuccessCounter.increment(); }

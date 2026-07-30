@@ -8,6 +8,7 @@ import org.errorradar.errorradar.auth.dto.RefreshRequest;
 import org.errorradar.errorradar.auth.dto.SignupRequest;
 import org.errorradar.errorradar.global.errorcode.ErrorCode;
 import org.errorradar.errorradar.global.exception.CustomException;
+import org.errorradar.errorradar.global.metrics.ErrorRadarMetrics;
 import org.errorradar.errorradar.global.security.JwtUtil;
 import org.errorradar.errorradar.user.entity.Role;
 import org.errorradar.errorradar.user.entity.User;
@@ -30,6 +31,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final RedisTemplate<String, String> redisTemplate;
+    private final ErrorRadarMetrics metrics;
 
     @Transactional
     public AuthResponse signup(SignupRequest request) {
@@ -55,9 +57,11 @@ public class AuthService {
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            metrics.incrementLoginFail();
             throw new CustomException(ErrorCode.INVALID_PASSWORD);
         }
 
+        metrics.incrementLoginSuccess();
         log.info("로그인 성공 - email: {}", user.getEmail());
         return issueTokens(user);
     }
