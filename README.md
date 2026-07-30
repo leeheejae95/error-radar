@@ -96,7 +96,7 @@ LogServiceImpl (구현체)
 → 부분 실패 없음
 ```
 
-### JWT Stateless 인증과 Token Rotation(로그인 -> 토큰 발급 -> API 요청 -> 갱신 -> 로그아웃 흐름)
+### JWT Stateless 인증과 Token Rotation(로그인 → 토큰 발급 → API 요청 → 갱신 → 로그아웃 흐름)
 
 ### Prometheus 커스텀 메트릭(errorradar.log.collected / alert.sent / login.success / login.fail)
 
@@ -405,7 +405,7 @@ EmbeddedKafka 환경에서 Consumer가 최초 파티션을 할당받기까지 `N
 // 타임아웃이 너무 짧아서 실패하는 코드
 Awaitility.await()
     .atMost(Duration.ofSeconds(10))  // Consumer 파티션 할당에만 ~9초 소요
-    .until(() -> errorLogRepository.count() == 1);
+    .until(() → errorLogRepository.count() == 1);
 ```
 
 **해결**
@@ -415,7 +415,7 @@ Awaitility 타임아웃을 30초로 늘리고 폴링 간격 명시:
 Awaitility.await()
     .atMost(Duration.ofSeconds(30))      // 최대 30초까지 대기
     .pollInterval(Duration.ofSeconds(1)) // 1초마다 조건 확인
-    .until(() -> errorLogRepository.count() == 1);
+    .until(() → errorLogRepository.count() == 1);
 ```
 
 ### 4. Grafana N/A - /actuator/prometheus가 Security에 막혀서 수집 실패 -> SecurityConfig에서 permitAll() 추가로 해결                  
