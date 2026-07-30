@@ -10,6 +10,7 @@ import org.errorradar.errorradar.auth.dto.RefreshRequest;
 import org.errorradar.errorradar.auth.dto.SignupRequest;
 import org.errorradar.errorradar.auth.service.AuthService;
 import org.errorradar.errorradar.global.response.ApiResponse;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -25,13 +26,13 @@ public class AuthController {
 
     @Operation(summary = "회원가입", description = "이메일, 비밀번호, 이름으로 계정을 생성합니다. 기본 권한은 USER입니다.")
     @PostMapping("/signup")
-    public ResponseEntity<ApiResponse<AuthResponse>> signup(@RequestBody SignupRequest request) {
+    public ResponseEntity<ApiResponse<AuthResponse>> signup(@Valid @RequestBody SignupRequest request) {
         return ResponseEntity.ok(ApiResponse.ok("회원가입이 완료되었습니다.", authService.signup(request)));
     }
 
     @Operation(summary = "로그인", description = "이메일, 비밀번호로 로그인하고 Access/Refresh Token을 발급받습니다.")
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<AuthResponse>> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(ApiResponse.ok("로그인 성공.", authService.login(request)));
     }
 
