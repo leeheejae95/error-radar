@@ -2,6 +2,7 @@ package org.errorradar.errorradar.log.consumer;
 
 import org.errorradar.errorradar.alert.service.AlertService;
 import org.errorradar.errorradar.global.exception.CustomException;
+import org.errorradar.errorradar.global.metrics.ErrorRadarMetrics;
 import org.errorradar.errorradar.log.dto.LogEvent;
 import org.errorradar.errorradar.log.entity.ErrorLog;
 import org.errorradar.errorradar.log.repository.ErrorLogRepository;
@@ -31,6 +32,9 @@ class LogConsumerServiceTest {
 
     @Mock
     private AlertService alertService;
+
+    @Mock
+    private ErrorRadarMetrics metrics;
 
     @InjectMocks
     private LogConsumerService logConsumerService;
