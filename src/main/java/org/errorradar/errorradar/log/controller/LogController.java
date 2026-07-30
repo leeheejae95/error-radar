@@ -4,14 +4,13 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.errorradar.errorradar.global.errorcode.ErrorCode;
-import org.errorradar.errorradar.global.exception.CustomException;
 import org.errorradar.errorradar.global.response.ApiResponse;
 import org.errorradar.errorradar.log.dto.LogEvent;
 import org.errorradar.errorradar.log.dto.LogRequest;
 import org.errorradar.errorradar.log.dto.LogResponse;
 import org.errorradar.errorradar.log.producer.LogProducerService;
 import org.errorradar.errorradar.log.service.LogService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -32,10 +31,8 @@ public class LogController {
             description = "애플리케이션에서 발생한 에러 로그를 Kafka로 비동기 처리합니다. 임계치 초과 시 Slack 알림이 발송됩니다."
     )
     @PostMapping("/collect")
-    public ResponseEntity<ApiResponse<String>> collectLog(@RequestBody LogRequest request) {
+    public ResponseEntity<ApiResponse<String>> collectLog(@Valid @RequestBody LogRequest request) {
         log.info("LogController 에러 로그 수집 요청 - 서비스: {}, 에러: {}", request.getServiceName(), request.getErrorType());
-
-        validateRequest(request);
 
         LogEvent event = LogEvent.builder()
                 .serviceName(request.getServiceName())
@@ -80,15 +77,4 @@ public class LogController {
         return ResponseEntity.ok(ApiResponse.ok(logService.getAlertedLogs()));
     }
 
-    private void validateRequest(LogRequest request) {
-        if (request.getServiceName() == null || request.getServiceName().isBlank()) {
-            throw new CustomException(ErrorCode.LOG_SERVICE_NOT_FOUND);
-        }
-        if (request.getErrorType() == null || request.getErrorType().isBlank()) {
-            throw new CustomException(ErrorCode.INVALID_LOG_LEVEL);
-        }
-        if (request.getErrorMessage() == null || request.getErrorMessage().isBlank()) {
-            throw new CustomException(ErrorCode.LOG_MESSAGE_NOT_FOUND);
-        }
-    }
 }
