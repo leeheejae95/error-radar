@@ -1,6 +1,6 @@
 # Error Radar - 실시간 장애 감지 플랫폼
 
-> Spring Boot와 Redis 및 kafka 기반 실시간 에러 패턴 감지 및 Slack 알림 시스템
+> Spring Boot, Kafka 및 Redis 기반 실시간 에러 패턴 감지, JWT 인증, Slack 알림 시스템
 > 실무에서 반복되는 에러 패턴을 감지하고 즉시 알림을 발송합니다.
 
 <br>
@@ -13,6 +13,9 @@
 - **중복 알림 방지** - 알림 발송 후 Redis 카운트 초기화로 중복 알림 방지
 - **장애 이력 관리** - MySQL에 에러 로그 영구 저장 및 조회
 - **서비스별 조회** - 서비스명, 장애 감지 여부로 로그 필터링
+- **JWT 인증/인가** - Access Token(1시간)과 Refresh Token(7일) 기반 인증
+- **역할 기반 접근 제어** - ADMIN/USER 역할별 API 접근 권한 분리
+- **실시간 모니터링** - Prometheus와 Grafana로 에러 수집, 알림, 로그인 메트릭 시각화
 
 <br>
 
@@ -34,7 +37,11 @@ Jennifer APM으로 장애를 분석하면서 동일한 에러 패턴이 반복�
 | Framework | Spring Boot 4.0.6 |  |
 | ORM | Spring Data JPA | 에러 로그 저장 |
 | Cache | Redis 7.2 | TTL 기반 시간 윈도우 카운팅 |           
-| Message Queue | Apache Kafka 4.1.2 | 비동기 로그 처리 파이프라인 |  
+| Message Queue | Apache Kafka 4.1.2 | 비동기 로그 처리 파이프라인 |
+| Security | Spring Security 7 + JWT | Stateless 인증, 역할 기반 접근 제어 |
+| JWT | jjwt 0.12.6 | Access/Refresh Token 발급 및 검증 |
+| 모니터링 | Prometheus + Grafana | 커스텀 메트릭 수집 및 시계열 시각화 |
+| Metrics | Micrometer | 비즈니스 메트릭 코드 계측 |
 | DB | MySQL 8.0 | 장애 이력 저장 |
 | 알림 | Slack Webhook | 실무에서 많이 사용하는 알림 채널 |
 | HTTP | RestClient | Slack API 호출 |
@@ -89,6 +96,10 @@ LogServiceImpl (구현체)
 → 부분 실패 없음
 ```
 
+### JWT Stateless 인증과 Token Rotation(로그인 -> 토큰 발급 -> API 요청 -> 갱신 -> 로그아웃 흐름)
+
+### Prometheus 커스텀 메트릭(errorradar.log.collected / alert.sent / login.success / login.fail)
+
 <br>
 
 ## 시스템 아키텍처
@@ -127,17 +138,33 @@ LogServiceImpl (구현체)
 ```
 src/main/java/org/errorradar/errorradar/
 ├── config/
-│   ├── KafkaConfig.java               # Kafka Producer/Consumer 설정                                                              
+│   ├── KafkaConfig.java               # Kafka Producer/Consumer 설정
 │   ├── KafkaTopicConfig.java          # Kafka 토픽 상수
 │   ├── RedisConfig.java               # Redis 직렬화 설정
-│   └── SwaggerConfig.java             # Swagger UI 설정
+│   └── SwaggerConfig.java             # Swagger UI + Bearer Token 설정
+├── auth/
+│   ├── controller/
+│   │   └── AuthController.java        # 회원가입/로그인/갱신/로그아웃 API
+│   ├── service/
+│   │   └── AuthService.java           # JWT 발급, Redis Refresh Token 관리
+│   └── dto/
+│       ├── SignupRequest.java          # 회원가입 요청 DTO
+│       ├── LoginRequest.java           # 로그인 요청 DTO
+│       ├── RefreshRequest.java         # 토큰 갱신 요청 DTO
+│       └── AuthResponse.java           # 인증 응답 DTO (토큰 + 사용자 정보)
+├── user/
+│   ├── entity/
+│   │   ├── User.java                  # 사용자 엔티티 (JPA)
+│   │   └── Role.java                  # 역할 Enum (ROLE_ADMIN, ROLE_USER)
+│   └── repository/
+│       └── UserRepository.java        # 사용자 JpaRepository
 ├── log/
-│   ├── producer/                                             
-│   │   └── LogProducerService.java    # Kafka 메시지 발행   
-│   ├── consumer/                                         
-│   │   └── LogConsumerService.java    # Kafka 메시지 수신 및 처리  
-│   ├── entity/						   # 에러 로그 엔티티 (JPA)
-│   │   └── ErrorLog.java              # 에러 로그 엔티티 (JPA)
+│   ├── producer/
+│   │   └── LogProducerService.java    # Kafka 메시지 발행
+│   ├── consumer/
+│   │   └── LogConsumerService.java    # Kafka 메시지 수신 및 처리
+│   ├── entity/
+│   │   └── ErrorLog.java             # 에러 로그 엔티티 (JPA)
 │   ├── repository/
 │   │   └── ErrorLogRepository.java    # 에러 로그 JpaRepository
 │   ├── service/
@@ -147,7 +174,7 @@ src/main/java/org/errorradar/errorradar/
 │   ├── controller/
 │   │   └── LogController.java         # 로그 수집 REST API
 │   └── dto/
-│       ├── LogEvent.java              # Kafka 메시지 DTO   
+│       ├── LogEvent.java              # Kafka 메시지 DTO
 │       ├── LogRequest.java            # 로그 수집 요청 DTO
 │       └── LogResponse.java           # 로그 수집 응답 DTO
 ├── pattern/
@@ -157,6 +184,13 @@ src/main/java/org/errorradar/errorradar/
 │   └── service/
 │       └── AlertService.java          # Slack 장애 알림 발송
 └── global/
+    ├── security/
+    │   ├── SecurityConfig.java        # Spring Security 필터 체인 설정
+    │   ├── JwtUtil.java               # JWT 생성/검증 유틸
+    │   ├── JwtAuthenticationFilter.java  # JWT 인증 필터 (OncePerRequestFilter)
+    │   └── UserDetailsServiceImpl.java   # DB 기반 사용자 로드
+    ├── metrics/
+    │   └── ErrorRadarMetrics.java     # Micrometer 커스텀 메트릭 (Counter)
     ├── errorcode/
     │   └── ErrorCode.java             # 에러 코드 Enum
     ├── exception/
@@ -214,6 +248,10 @@ http://localhost:8080/swagger-ui.html
 | GET | /api/logs/getLogs | 전체 에러 로그 조회 |
 | GET | /api/logs/service/{serviceName} | 서비스별 에러 로그 조회 |
 | GET | /api/logs/alerted | 장애 감지된 로그 조회 |
+| POST | /api/auth/signup | 회원가입 |                       
+| POST | /api/auth/login  | 로그인, 토큰 발급 |              
+| POST | /api/auth/refresh | 토큰 재발급 |
+| POST | /api/auth/logout  | 로그아웃 |
 
 ### 요청 예시
 ```
@@ -257,8 +295,9 @@ alert:
 - **Spring AOP 적용** - 예외 발생 시 자동으로 에러 로그 수집 (현재는 API 직접 호출)
 - **에러 통계 대시보드** - 서비스별 에러 발생 추이 시각화
 - **알림 채널 확장** - 이메일, 카카오톡 등 다양한 알림 채널 지원
-- **MSA 전환** - 도메인 패키지 기반으로 서비스 분리 가능한 구조
-
+- **입력값 검증 강화** - @Valid와 @Email, @Size 기반 요청 파라미터 검증
+- **환경변수 분리** - JWT Secret 등 민감 정보를 환경변수로 외부화
+    
 <br>
 
 ## 트러블슈팅
@@ -351,7 +390,7 @@ org.awaitility.core.ConditionTimeoutException:
 
 Kafka Consumer는 비동기로 동작하기 때문에 아래와 같이 테스트하면 항상 실패
 
-```java
+```
 // 잘못된 방법 - Consumer가 아직 처리 안 했으니 DB에 데이터가 없음
 logProducerService.sendLog(event);  // Kafka에 발행
 assertThat(errorLogRepository.count()).isEqualTo(1);  // 즉시 확인 → 실패
@@ -362,7 +401,7 @@ EmbeddedKafka 환경에서 Consumer가 최초 파티션을 할당받기까지 `N
 약 9초 소요
 - 타임아웃을 10초로 설정하면 DB 저장 시점이 타임아웃 직후가 되어 간헐적으로 실패
 
-```java
+```
 // 타임아웃이 너무 짧아서 실패하는 코드
 Awaitility.await()
     .atMost(Duration.ofSeconds(10))  // Consumer 파티션 할당에만 ~9초 소요
@@ -372,9 +411,13 @@ Awaitility.await()
 **해결**
 
 Awaitility 타임아웃을 30초로 늘리고 폴링 간격 명시:
-```java
+```
 Awaitility.await()
     .atMost(Duration.ofSeconds(30))      // 최대 30초까지 대기
     .pollInterval(Duration.ofSeconds(1)) // 1초마다 조건 확인
     .until(() -> errorLogRepository.count() == 1);
 ```
+
+### 4. Grafana N/A - /actuator/prometheus가 Security에 막혀서 수집 실패 -> SecurityConfig에서 permitAll() 추가로 해결                  
+                                                                                                                                                                                                                                   
+### 5. Spring Boot 4 ObjectMapper 자동 주입 실패 (Jackson 3 패키지 변경) -> SecurityConfig에서 ObjectMapper 제거하고 JSON 문자열 직접 작성으로 해결 
