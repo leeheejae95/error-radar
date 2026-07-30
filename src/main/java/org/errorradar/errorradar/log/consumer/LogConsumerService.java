@@ -22,6 +22,7 @@ public class LogConsumerService {
     private final PatternDetectService patternDetectService;
     private final AlertService alertService;
     private final ObjectMapper objectMapper;
+    private final ErrorRadarMetrics metrics;
 
     @KafkaListener(topics = KafkaTopicConfig.ERROR_LOG_TOPIC, groupId = "error-radar-group")
     public void consume(String message) {
@@ -42,6 +43,7 @@ public class LogConsumerService {
                 .environment(event.getEnvironment())
                 .build();
         ErrorLog savedLog = errorLogRepository.save(errorLog);
+        metrics.incrementLogCollected();
 
         log.info("에러 로그 DB 저장 완료 - 서비스: {}, 에러: {}", event.getServiceName(), event.getErrorType());
 
@@ -54,6 +56,7 @@ public class LogConsumerService {
             log.info("임계치 초과 - 서비스: {}, 에러: {}, 횟수: {}", event.getServiceName(), event.getErrorType(), count);
 
             alertService.sendSlackAlert(event.getServiceName(), event.getErrorType(), event.getErrorMessage(), count);
+            metrics.incrementAlertSent();
             savedLog.markAsAlerted();
             patternDetectService.resetCount(event.getServiceName(), event.getErrorType());
         }
